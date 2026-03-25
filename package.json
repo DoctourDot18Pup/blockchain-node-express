@@ -1,0 +1,38 @@
+{
+  "name": "blockchain-node-express",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "node1": "PORT=8001 nodemon src/app.js",
+    "node2": "PORT=8002 nodemon src/app.js",
+    "node3": "PORT=8003 nodemon src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DoctourDot18Pup/blockchain-node-express.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DoctourDot18Pup/blockchain-node-express/issues"
+  },
+  "homepage": "https://github.com/DoctourDot18Pup/blockchain-node-express#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.0",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "morgan": "^1.10.1",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
