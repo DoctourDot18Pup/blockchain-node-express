@@ -117,6 +117,7 @@ async function cargarCadena() {
   }
 
   const bloquesRestaurados = Object.values(bloquesPorIndex)
+    .sort((a, b) => a.index - b.index) // Ordenar por índice
 
   // El génesis nunca se persiste en grados (no tiene transacciones académicas)
   // Lo reconstruimos como bloque sintético usando el hash_anterior del bloque más antiguo
