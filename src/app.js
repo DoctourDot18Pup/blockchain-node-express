@@ -12,6 +12,7 @@ const nodeRoutes        = require('./routes/nodes')
 const swaggerUi   = require('swagger-ui-express')
 const YAML        = require('yamljs')
 const swaggerDoc  = YAML.load('./swagger.yaml')
+const cors = require('cors')
 
 async function startServer() {
   const app  = express()
@@ -23,6 +24,7 @@ async function startServer() {
   app.set('blockchain', blockchain)
 
   app.use(express.json())
+  app.use(cors())
   app.use(logger)
 
   app.use('/chain',        chainRoutes)
