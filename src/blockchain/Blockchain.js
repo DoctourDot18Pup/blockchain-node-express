@@ -1,13 +1,13 @@
-const Block       = require('./Block')
+const Block = require('./Block')
 const Transaction = require('./Transaction')
 
 const DIFFICULTY = parseInt(process.env.PROOF_OF_WORK_DIFFICULTY || '3')
 
 class Blockchain {
   constructor() {
-    this.chain                   = []
+    this.chain = []
     this.transaccionesPendientes = []
-    this.nodos                   = new Set()
+    this.nodos = new Set()
   }
 
   /**
@@ -16,8 +16,12 @@ class Blockchain {
    * Se debe llamar con await antes de arrancar el servidor.
    */
   async inicializar() {
-    const { cargarCadena } = require('../db/grados')
-    const bloquesPersistidos = await cargarCadena()
+    const { cargarCadena, cargarPeers } = require('../db/grados')
+
+    const [bloquesPersistidos, peersPersistidos] = await Promise.all([
+      cargarCadena(),
+      cargarPeers(process.env.NODE_ID || 'nodo-1'),
+    ])
 
     if (bloquesPersistidos.length > 0) {
       this.chain = bloquesPersistidos
@@ -25,8 +29,12 @@ class Blockchain {
     } else {
       this._crearBloqueGenesis()
     }
-  }
 
+    peersPersistidos.forEach(dir => this.nodos.add(dir))
+    if (peersPersistidos.length > 0) {
+      console.log(`[Blockchain] ${peersPersistidos.length} peer(s) restaurados desde Supabase`)
+    }
+  }
   // ─── Bloque génesis ──────────────────────────────────────────────────────────
 
   _crearBloqueGenesis() {
@@ -50,10 +58,10 @@ class Blockchain {
   // ─── Proof of Work ───────────────────────────────────────────────────────────
 
   proofOfWork(data) {
-    const index        = this.chain.length
-    const timestamp    = Date.now()
+    const index = this.chain.length
+    const timestamp = Date.now()
     const hashAnterior = this.ultimoBloque.hashActual
-    let nonce          = 0
+    let nonce = 0
 
     console.log(`[PoW] Minando bloque #${index} con dificultad ${DIFFICULTY}...`)
 
@@ -76,7 +84,7 @@ class Blockchain {
 
     const data = {
       transacciones: [...this.transaccionesPendientes],
-      minadoPor:     nodeId,
+      minadoPor: nodeId,
     }
 
     const bloque = this.proofOfWork(data)
@@ -105,7 +113,7 @@ class Blockchain {
 
   esValida(chain = this.chain) {
     for (let i = 1; i < chain.length; i++) {
-      const actual   = chain[i]
+      const actual = chain[i]
       const anterior = chain[i - 1]
 
       const bloqueRecalculado = new Block(
@@ -145,8 +153,13 @@ class Blockchain {
   // ─── Nodos ───────────────────────────────────────────────────────────────────
 
   registrarNodo(direccion) {
-    this.nodos.add(direccion.replace(/\/$/, ''))
-    console.log(`[Red] Nodo registrado: ${direccion}. Total nodos: ${this.nodos.size}`)
+    const dir = direccion.replace(/\/$/, '')
+    this.nodos.add(dir)
+    console.log(`[Red] Nodo registrado: ${dir}. Total nodos: ${this.nodos.size}`)
+
+    const { guardarPeer } = require('../db/grados')
+    guardarPeer(process.env.NODE_ID || 'nodo-1', dir)
+      .catch(err => console.error('[Blockchain] Error guardando peer:', err.message))
   }
 
   getNodos() {

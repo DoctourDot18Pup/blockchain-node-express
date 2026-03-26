@@ -134,4 +134,27 @@ async function cargarCadena() {
   return [genesisReconstruido, ...bloquesRestaurados]
 }
 
-module.exports = { persistirBloque, marcarComoPropagado, cargarCadena }
+async function guardarPeer(nodeId, direccion) {
+  const { error } = await supabase
+    .from('nodos_red')
+    .upsert(
+      { nodo_origen: nodeId, direccion, activo: true },
+      { onConflict: 'nodo_origen,direccion' }
+    )
+  if (error) console.error('[DB] Error al guardar peer:', error.message)
+}
+
+async function cargarPeers(nodeId) {
+  const { data, error } = await supabase
+    .from('nodos_red')
+    .select('direccion')
+    .eq('nodo_origen', nodeId)
+    .eq('activo', true)
+  if (error) {
+    console.error('[DB] Error al cargar peers:', error.message)
+    return []
+  }
+  return data.map(r => r.direccion)
+}
+
+module.exports = { persistirBloque, marcarComoPropagado, cargarCadena, guardarPeer, cargarPeers }
