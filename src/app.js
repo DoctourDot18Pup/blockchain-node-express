@@ -8,6 +8,7 @@ const chainRoutes       = require('./routes/chain')
 const mineRoutes        = require('./routes/mine')
 const transactionRoutes = require('./routes/transactions')
 const nodeRoutes        = require('./routes/nodes')
+const blocksRoutes      = require('./routes/blocks')
 
 const swaggerUi  = require('swagger-ui-express')
 const YAML       = require('yamljs')
@@ -31,7 +32,7 @@ async function startServer() {
   app.use('/mine',         mineRoutes)
   app.use('/transactions', transactionRoutes)
   app.use('/nodes',        nodeRoutes)
-  app.use('/blocks',       nodeRoutes)   // expone POST /blocks/receive
+  app.use('/blocks',       blocksRoutes)
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc))
 
@@ -46,7 +47,6 @@ async function startServer() {
     })
   })
 
-  // Crea el bloque génesis si la cadena está vacía
   app.post('/genesis', async (req, res) => {
     if (blockchain.chain.length > 0) {
       return res.status(400).json({ mensaje: 'La cadena ya tiene bloques' })

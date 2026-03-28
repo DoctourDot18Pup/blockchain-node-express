@@ -25,8 +25,9 @@ router.post('/register', (req, res) => {
 /**
  * POST /blocks/receive
  * Recibe un bloque propagado por otro nodo y lo valida antes de aceptarlo.
+ * Montado en app.js bajo /blocks, por lo que esta ruta es /receive internamente.
  */
-router.post('/blocks/receive', (req, res) => {
+router.post('/receive', (req, res) => {
   const blockchain = req.app.get('blockchain')
   const bloque     = req.body
 
