@@ -1,14 +1,14 @@
-const Block      = require('./Block')
+const Block = require('./Block')
 const Transaction = require('./Transaction')
-const { sha256 }  = require('../utils/hash')
+const { sha256 } = require('../utils/hash')
 
 const DIFFICULTY = parseInt(process.env.PROOF_OF_WORK_DIFFICULTY || '3')
 
 class Blockchain {
   constructor() {
-    this.chain                   = []
+    this.chain = []
     this.transaccionesPendientes = []
-    this.nodos                   = new Set()
+    this.nodos = new Set()
   }
 
   /**
@@ -41,22 +41,22 @@ class Blockchain {
   _crearBloqueGenesis() {
     // El génesis usa campos nulos/vacíos — se calcula el nonce igual que cualquier bloque
     let nonce = 0
-    let hash  = sha256('', '', 'GENESIS', '2000-01-01', '', nonce)
+    let hash = sha256('', '', 'GENESIS', '2000-01-01', '', nonce)
     while (!hash.startsWith('0'.repeat(DIFFICULTY))) {
       nonce++
       hash = sha256('', '', 'GENESIS', '2000-01-01', '', nonce)
     }
 
     const genesis = {
-      persona_id:      null,
-      institucion_id:  null,
-      programa_id:     null,
+      persona_id: null,
+      institucion_id: null,
+      programa_id: null,
       titulo_obtenido: 'GENESIS',
-      fecha_fin:       '2000-01-01',
-      hash_anterior:   null,
-      hash_actual:     hash,
+      fecha_fin: '2000-01-01',
+      hash_anterior: null,
+      hash_actual: hash,
       nonce,
-      firmado_por:     'sistema',
+      firmado_por: 'sistema',
     }
 
     this.chain.push(genesis)
@@ -78,20 +78,20 @@ class Blockchain {
     console.log(`[PoW] Minando con dificultad ${'0'.repeat(DIFFICULTY)}...`)
 
     let hash = sha256(
-      tx.persona_id      ?? '',
-      tx.institucion_id  ?? '',
+      tx.persona_id ?? '',
+      tx.institucion_id ?? '',
       tx.titulo_obtenido ?? '',
-      tx.fecha_fin       ?? '',
+      tx.fecha_fin ?? '',
       hashAnterior,
       nonce,
     )
     while (!hash.startsWith('0'.repeat(DIFFICULTY))) {
       nonce++
       hash = sha256(
-        tx.persona_id      ?? '',
-        tx.institucion_id  ?? '',
+        tx.persona_id ?? '',
+        tx.institucion_id ?? '',
         tx.titulo_obtenido ?? '',
-        tx.fecha_fin       ?? '',
+        tx.fecha_fin ?? '',
         hashAnterior,
         nonce,
       )
@@ -114,19 +114,19 @@ class Blockchain {
     const { nonce, hash, hashAnterior } = this.proofOfWork(tx)
 
     const bloque = {
-      persona_id:      tx.persona_id,
-      institucion_id:  tx.institucion_id,
-      programa_id:     tx.programa_id     ?? null,
+      persona_id: tx.persona_id,
+      institucion_id: tx.institucion_id,
+      programa_id: tx.programa_id ?? null,
       titulo_obtenido: tx.titulo_obtenido,
-      fecha_inicio:    tx.fecha_inicio    ?? null,
-      fecha_fin:       tx.fecha_fin,
-      numero_cedula:   tx.numero_cedula   ?? null,
-      titulo_tesis:    tx.titulo_tesis    ?? null,
-      menciones:       tx.menciones       ?? null,
-      hash_actual:     hash,
-      hash_anterior:   hashAnterior,
+      fecha_inicio: tx.fecha_inicio ?? null,
+      fecha_fin: tx.fecha_fin,
+      numero_cedula: tx.numero_cedula ?? null,
+      titulo_tesis: tx.titulo_tesis ?? null,
+      menciones: tx.menciones ?? null,
+      hash_actual: hash,
+      hash_anterior: hashAnterior,
       nonce,
-      firmado_por:     nodeId,
+      firmado_por: nodeId,
     }
 
     this.chain.push(bloque)
@@ -154,7 +154,7 @@ class Blockchain {
 
   esValida(chain = this.chain) {
     for (let i = 1; i < chain.length; i++) {
-      const actual   = chain[i]
+      const actual = chain[i]
       const anterior = chain[i - 1]
 
       // Verificar encadenamiento
@@ -165,11 +165,11 @@ class Blockchain {
 
       // Recalcular hash con la fórmula canónica
       const hashRecalculado = sha256(
-        actual.persona_id      ?? '',
-        actual.institucion_id  ?? '',
+        actual.persona_id ?? '',
+        actual.institucion_id ?? '',
         actual.titulo_obtenido ?? '',
-        actual.fecha_fin       ?? '',
-        actual.hash_anterior   ?? '',
+        actual.fecha_fin ?? '',
+        actual.hash_anterior ?? '',
         actual.nonce,
       )
 
@@ -201,6 +201,18 @@ class Blockchain {
 
   registrarNodo(url) {
     const dir = url.replace(/\/$/, '')
+
+    // Un nodo nunca debe registrarse a sí mismo
+    const propioPort = process.env.PORT || '8001'
+    const propiasUrls = [
+      `http://localhost:${propioPort}`,
+      `http://127.0.0.1:${propioPort}`,
+    ]
+    if (propiasUrls.includes(dir)) {
+      console.warn(`[Red] Ignorado: intento de registrar el nodo propio (${dir})`)
+      return
+    }
+
     this.nodos.add(dir)
     console.log(`[Red] Nodo registrado: ${dir}. Total nodos: ${this.nodos.size}`)
 
