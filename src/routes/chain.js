@@ -3,7 +3,8 @@ const router  = express.Router()
 
 /**
  * GET /chain
- * Retorna la cadena completa y su longitud
+ * Retorna la cadena completa y su longitud.
+ * Response: { chain: [...], length: N }
  */
 router.get('/', (req, res) => {
   const blockchain = req.app.get('blockchain')

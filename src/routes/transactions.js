@@ -4,14 +4,14 @@ const router  = express.Router()
 
 /**
  * POST /transactions
- * Recibe una transacción, la agrega a pendientes y la propaga a los peers
- * Header X-Propagated: true evita re-propagación infinita
+ * Recibe una transacción en snake_case, la agrega a pendientes y la propaga.
+ * Header X-Propagated: true evita re-propagación infinita.
  */
 router.post('/', async (req, res) => {
-  const blockchain  = req.app.get('blockchain')
-  const propagado   = req.headers['x-propagated'] === 'true'
+  const blockchain = req.app.get('blockchain')
+  const propagado  = req.headers['x-propagated'] === 'true'
 
-  const camposRequeridos = ['personaId', 'institucionId', 'programaId', 'tituloObtenido', 'fechaFin', 'firmadoPor']
+  const camposRequeridos = ['persona_id', 'institucion_id', 'programa_id', 'titulo_obtenido', 'fecha_fin', 'firmado_por']
   const faltantes = camposRequeridos.filter(c => !req.body[c])
 
   if (faltantes.length > 0) {
@@ -20,7 +20,6 @@ router.post('/', async (req, res) => {
 
   const tx = blockchain.agregarTransaccion(req.body)
 
-  // Propagar a peers solo si no es un mensaje ya propagado
   if (!propagado) {
     const nodos = blockchain.getNodos()
     const propagaciones = nodos.map(nodo =>
@@ -32,10 +31,9 @@ router.post('/', async (req, res) => {
   }
 
   res.status(201).json({
-    mensaje:       'Transacción agregada',
-    transaccion:   tx,
-    propagada:     !propagado,
-    indiceBloque:  blockchain.chain.length,
+    mensaje:     'Transacción agregada',
+    transaccion: tx,
+    propagada:   !propagado,
   })
 })
 

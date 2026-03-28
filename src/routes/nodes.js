@@ -4,56 +4,56 @@ const router  = express.Router()
 
 /**
  * POST /nodes/register
- * Registra uno o varios nodos peers en la red
+ * Registra un nodo peer. Campo: "url" (contrato común).
  */
 router.post('/register', (req, res) => {
   const blockchain = req.app.get('blockchain')
-  const { nodos }  = req.body
+  const { url }    = req.body
 
-  if (!nodos || !Array.isArray(nodos) || nodos.length === 0) {
-    return res.status(400).json({ error: 'Se requiere un array "nodos" con al menos una dirección' })
+  if (!url) {
+    return res.status(400).json({ error: 'Se requiere el campo "url"' })
   }
 
-  nodos.forEach(n => blockchain.registrarNodo(n))
+  blockchain.registrarNodo(url)
 
   res.json({
-    mensaje:      'Nodos registrados',
+    mensaje:      'Nodo registrado',
     nodosActivos: blockchain.getNodos(),
   })
 })
 
 /**
- * POST /nodes/block
- * Recibe un bloque propagado por otro nodo y lo valida antes de aceptarlo
+ * POST /blocks/receive
+ * Recibe un bloque propagado por otro nodo y lo valida antes de aceptarlo.
  */
-router.post('/block', (req, res) => {
+router.post('/blocks/receive', (req, res) => {
   const blockchain = req.app.get('blockchain')
-  const { bloque } = req.body
+  const bloque     = req.body
 
-  if (!bloque) {
-    return res.status(400).json({ error: 'Se requiere el campo "bloque"' })
+  if (!bloque || !bloque.hash_actual) {
+    return res.status(400).json({ error: 'Body inválido: se requiere un bloque con hash_actual' })
   }
 
   const ultimoLocal = blockchain.ultimoBloque
+  const DIFFICULTY  = parseInt(process.env.PROOF_OF_WORK_DIFFICULTY || '3')
 
-  // Validaciones básicas del bloque recibido
-  if (bloque.hashAnterior !== ultimoLocal.hashActual) {
-    return res.status(409).json({ error: 'El hash anterior no coincide — posible conflicto, usa /nodes/resolve' })
+  if (bloque.hash_anterior !== ultimoLocal.hash_actual) {
+    return res.status(409).json({ error: 'El hash anterior no coincide — usa /nodes/resolve para sincronizar' })
   }
 
-  if (!bloque.hashActual.startsWith('0'.repeat(parseInt(process.env.PROOF_OF_WORK_DIFFICULTY || '3')))) {
-    return res.status(400).json({ error: 'El bloque no cumple Proof of Work' })
+  if (!bloque.hash_actual.startsWith('0'.repeat(DIFFICULTY))) {
+    return res.status(400).json({ error: 'El bloque no cumple el Proof of Work requerido' })
   }
 
   blockchain.chain.push(bloque)
-  console.log(`[Red] Bloque #${bloque.index} aceptado desde peer`)
+  console.log(`[Red] Bloque aceptado desde peer | hash: ${bloque.hash_actual.slice(0, 12)}...`)
 
   res.json({ mensaje: 'Bloque aceptado', bloque })
 })
 
 /**
  * GET /nodes/resolve
- * Algoritmo de consenso: adopta la cadena válida más larga de los peers
+ * Algoritmo de consenso: adopta la cadena válida más larga de los peers.
  */
 router.get('/resolve', async (req, res) => {
   const blockchain = req.app.get('blockchain')
@@ -88,11 +88,14 @@ router.get('/resolve', async (req, res) => {
 
 /**
  * GET /nodes
- * Lista todos los nodos registrados
+ * Lista todos los nodos registrados.
  */
 router.get('/', (req, res) => {
   const blockchain = req.app.get('blockchain')
-  res.json({ nodos: blockchain.getNodos() })
+  res.json({
+    nodos: blockchain.getNodos(),
+    total: blockchain.getNodos().length,
+  })
 })
 
 module.exports = router

@@ -4,20 +4,20 @@ const router  = express.Router()
 
 /**
  * POST /mine
- * Mina las transacciones pendientes, genera un bloque y lo propaga
+ * Mina la primera transacción pendiente, genera un bloque y lo propaga
+ * a todos los peers mediante POST /blocks/receive (contrato común).
  */
 router.post('/', async (req, res) => {
   const blockchain = req.app.get('blockchain')
   const nodeId     = process.env.NODE_ID || 'nodo-desconocido'
 
   try {
-    const bloque = blockchain.minar(nodeId)
+    const bloque = await blockchain.minar(nodeId)
 
-    // Propagar bloque minado a todos los peers
     const nodos = blockchain.getNodos()
     const propagaciones = nodos.map(nodo =>
-      axios.post(`${nodo}/nodes/block`, { bloque }, {
-        headers: { 'X-Propagated': 'true' }
+      axios.post(`${nodo}/blocks/receive`, bloque, {
+        headers: { 'Content-Type': 'application/json' }
       }).catch(err => console.warn(`[Propagacion] Fallo nodo ${nodo}: ${err.message}`))
     )
     await Promise.allSettled(propagaciones)
