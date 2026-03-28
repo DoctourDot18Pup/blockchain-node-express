@@ -4,6 +4,7 @@ const router  = express.Router()
 /**
  * POST /blocks/receive
  * Recibe un bloque propagado por otro nodo y lo valida antes de aceptarlo.
+ * También limpia de la mempool local las transacciones ya confirmadas.
  */
 router.post('/receive', (req, res) => {
   const blockchain = req.app.get('blockchain')
@@ -25,7 +26,17 @@ router.post('/receive', (req, res) => {
   }
 
   blockchain.chain.push(bloque)
+
+  // Limpiar de la mempool local las transacciones que este bloque ya confirmó
+  // Se compara por persona_id + titulo_obtenido + fecha_fin como identificador único
+  blockchain.transaccionesPendientes = blockchain.transaccionesPendientes.filter(tx =>
+    !(tx.persona_id      === bloque.persona_id      &&
+      tx.titulo_obtenido === bloque.titulo_obtenido  &&
+      tx.fecha_fin       === bloque.fecha_fin)
+  )
+
   console.log(`[Red] Bloque aceptado desde peer | hash: ${bloque.hash_actual.slice(0, 12)}...`)
+  console.log(`[Red] Mempool local: ${blockchain.transaccionesPendientes.length} transacciones pendientes`)
 
   res.json({ mensaje: 'Bloque aceptado', bloque })
 })
