@@ -9,16 +9,15 @@ const mineRoutes        = require('./routes/mine')
 const transactionRoutes = require('./routes/transactions')
 const nodeRoutes        = require('./routes/nodes')
 
-const swaggerUi   = require('swagger-ui-express')
-const YAML        = require('yamljs')
-const swaggerDoc  = YAML.load('./swagger.yaml')
-const cors = require('cors')
+const swaggerUi  = require('swagger-ui-express')
+const YAML       = require('yamljs')
+const swaggerDoc = YAML.load('./swagger.yaml')
+const cors       = require('cors')
 
 async function startServer() {
   const app  = express()
   const PORT = process.env.PORT || 8001
 
-  // Inicializar blockchain (carga desde Supabase o crea génesis)
   const blockchain = new Blockchain()
   await blockchain.inicializar()
   app.set('blockchain', blockchain)
@@ -27,20 +26,35 @@ async function startServer() {
   app.use(cors())
   app.use(logger)
 
+  // Rutas del contrato común
   app.use('/chain',        chainRoutes)
   app.use('/mine',         mineRoutes)
   app.use('/transactions', transactionRoutes)
   app.use('/nodes',        nodeRoutes)
+  app.use('/blocks',       nodeRoutes)   // expone POST /blocks/receive
+
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc))
-  
+
   app.get('/health', (req, res) => {
     res.json({
       status:     'ok',
-      nodeId:     process.env.NODE_ID || 'nodo-1',
+      node_id:    process.env.NODE_ID || 'nodo-1',
       port:       PORT,
       bloques:    blockchain.chain.length,
       pendientes: blockchain.transaccionesPendientes.length,
       peers:      blockchain.getNodos(),
+    })
+  })
+
+  // Crea el bloque génesis si la cadena está vacía
+  app.post('/genesis', async (req, res) => {
+    if (blockchain.chain.length > 0) {
+      return res.status(400).json({ mensaje: 'La cadena ya tiene bloques' })
+    }
+    blockchain._crearBloqueGenesis()
+    res.status(201).json({
+      mensaje: 'Bloque génesis creado',
+      bloque:  blockchain.chain[0],
     })
   })
 
