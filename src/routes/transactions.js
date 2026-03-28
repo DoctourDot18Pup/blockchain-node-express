@@ -6,6 +6,7 @@ const router  = express.Router()
  * POST /transactions
  * Recibe una transacción en snake_case, la agrega a pendientes y la propaga.
  * Header X-Propagated: true evita re-propagación infinita.
+ * Deduplicación por ID o por campos únicos para evitar duplicados en mempool.
  */
 router.post('/', async (req, res) => {
   const blockchain = req.app.get('blockchain')
@@ -16,6 +17,24 @@ router.post('/', async (req, res) => {
 
   if (faltantes.length > 0) {
     return res.status(400).json({ error: `Campos requeridos: ${faltantes.join(', ')}` })
+  }
+
+  // Deduplicar: ignorar si la transacción ya está en la mempool
+  const yaExiste = blockchain.transaccionesPendientes.some(tx => {
+    if (req.body.id) return tx.id === req.body.id
+    return (
+      tx.persona_id      === req.body.persona_id &&
+      tx.titulo_obtenido === req.body.titulo_obtenido &&
+      tx.fecha_fin       === req.body.fecha_fin
+    )
+  })
+
+  if (yaExiste) {
+    return res.status(200).json({
+      mensaje:     'Transacción ya existente, ignorada',
+      transaccion: req.body,
+      propagada:   false,
+    })
   }
 
   const tx = blockchain.agregarTransaccion(req.body)
