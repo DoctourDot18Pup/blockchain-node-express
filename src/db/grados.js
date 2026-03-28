@@ -2,159 +2,91 @@ const supabase = require('./supabase')
 
 /**
  * Persiste un bloque minado en la tabla grados.
- * Cada transacción dentro del bloque genera un registro individual.
+ * Un bloque = un registro en la tabla (estructura plana, sin anidamiento).
  *
- * @param {Block} bloque - Bloque recién minado
- * @param {string} nodeId - ID del nodo que mina
+ * @param {Object} bloque  - Bloque recién minado con campos snake_case
+ * @param {string} nodeId  - ID del nodo que mina
  */
 async function persistirBloque(bloque, nodeId) {
-  const transacciones = bloque.data?.transacciones || []
-
-  if (transacciones.length === 0) {
-    console.warn('[DB] Bloque sin transacciones académicas, nada que persistir')
-    return
+  const registro = {
+    persona_id:      bloque.persona_id      ?? null,
+    institucion_id:  bloque.institucion_id  ?? null,
+    programa_id:     bloque.programa_id     ?? null,
+    titulo_obtenido: bloque.titulo_obtenido,
+    fecha_inicio:    bloque.fecha_inicio    ?? null,
+    fecha_fin:       bloque.fecha_fin,
+    numero_cedula:   bloque.numero_cedula   ?? null,
+    titulo_tesis:    bloque.titulo_tesis    ?? null,
+    menciones:       bloque.menciones       ?? null,
+    hash_actual:     bloque.hash_actual,
+    hash_anterior:   bloque.hash_anterior   ?? null,
+    nonce:           bloque.nonce,
+    firmado_por:     bloque.firmado_por     ?? nodeId,
   }
 
-  const registros = transacciones.map((tx) => ({
-    id:                    tx.id,
-    persona_id:            tx.personaId,
-    institucion_id:        tx.institucionId,
-    programa_id:           tx.programaId,
-    titulo_obtenido:       tx.tituloObtenido,
-    fecha_fin:             tx.fechaFin,
-    numero_cedula:         tx.numeroCedula || null,
-    titulo_tesis:          tx.tituloTesis  || null,
-    menciones:             tx.menciones    || null,
-    firmado_por:           tx.firmadoPor,
-    hash_actual:           bloque.hashActual,
-    hash_anterior:         bloque.hashAnterior,
-    nonce:                 bloque.nonce,
-    bloque_index:          bloque.index,
-    nodo_origen:           nodeId,
-    propagado:             false,
-    intentos_propagacion:  0,
-    validado_por:          [],
-  }))
-
-  const { error } = await supabase.from('grados').insert(registros)
+  const { error } = await supabase.from('grados').insert([registro])
 
   if (error) {
     console.error('[DB] Error al persistir bloque:', error.message)
     throw error
   }
 
-  console.log(`[DB] ${registros.length} grado(s) del bloque #${bloque.index} persistidos en Supabase`)
+  console.log(`[DB] Bloque persistido en Supabase | hash: ${bloque.hash_actual.slice(0, 12)}...`)
 }
 
 /**
- * Marca un bloque como propagado exitosamente
- * @param {string} hashActual
- * @param {string[]} nodosValidadores
- */
-async function marcarComoPropagado(hashActual, nodosValidadores = []) {
-  const { error } = await supabase
-    .from('grados')
-    .update({
-      propagado:    true,
-      validado_por: nodosValidadores,
-    })
-    .eq('hash_actual', hashActual)
-
-  if (error) {
-    console.error('[DB] Error al marcar propagación:', error.message)
-  }
-}
-
-/**
- * Carga todos los bloques desde Supabase para reconstruir la cadena
- * al reiniciar el nodo.
+ * Carga todos los bloques desde Supabase ordenados cronológicamente
+ * para reconstruir la cadena al reiniciar el nodo.
  *
- * @returns {Object[]} Bloques ordenados por índice
+ * @returns {Object[]} Bloques en formato plano (snake_case)
  */
 async function cargarCadena() {
   const { data, error } = await supabase
     .from('grados')
     .select('*')
-    .order('bloque_index', { ascending: true })
-    .order('creado_en',    { ascending: true })
+    .order('creado_en', { ascending: true })
 
   if (error) {
     console.error('[DB] Error al cargar cadena:', error.message)
     return []
   }
 
-  if (data.length === 0) return []
-
-  // Agrupar registros por bloque_index
-  const bloquesPorIndex = {}
-  for (const registro of data) {
-    const idx = registro.bloque_index
-    if (!bloquesPorIndex[idx]) {
-      bloquesPorIndex[idx] = {
-        index:        idx,
-        hashActual:   registro.hash_actual,
-        hashAnterior: registro.hash_anterior,
-        nonce:        registro.nonce,
-        timestamp:    new Date(registro.creado_en).getTime(),
-        data: {
-          minadoPor:     registro.nodo_origen,
-          transacciones: [],
-        },
-      }
-    }
-    bloquesPorIndex[idx].data.transacciones.push({
-      id:             registro.id,
-      personaId:      registro.persona_id,
-      institucionId:  registro.institucion_id,
-      programaId:     registro.programa_id,
-      tituloObtenido: registro.titulo_obtenido,
-      fechaFin:       registro.fecha_fin,
-      numeroCedula:   registro.numero_cedula,
-      tituloTesis:    registro.titulo_tesis,
-      menciones:      registro.menciones,
-      firmadoPor:     registro.firmado_por,
-    })
-  }
-
-  const bloquesRestaurados = Object.values(bloquesPorIndex)
-    .sort((a, b) => a.index - b.index) // Ordenar por índice
-
-  // El génesis nunca se persiste en grados (no tiene transacciones académicas)
-  // Lo reconstruimos como bloque sintético usando el hash_anterior del bloque más antiguo
-  const primerBloque = bloquesRestaurados[0]
-  const genesisReconstruido = {
-    index:        0,
-    hashActual:   primerBloque.hashAnterior,
-    hashAnterior: '0',
-    nonce:        0,
-    timestamp:    primerBloque.timestamp - 1,
-    data:         { mensaje: 'Bloque Génesis - Red Blockchain Grados Académicos' },
-  }
-
-  return [genesisReconstruido, ...bloquesRestaurados]
+  return data || []
 }
 
+/**
+ * Guarda la URL de un peer en la tabla nodos.
+ *
+ * @param {string} nodeId    - ID del nodo local (no usado en filtro)
+ * @param {string} direccion - URL del peer (sin trailing slash)
+ */
 async function guardarPeer(nodeId, direccion) {
   const { error } = await supabase
-    .from('nodos_red')
+    .from('nodos')
     .upsert(
-      { nodo_origen: nodeId, direccion, activo: true },
-      { onConflict: 'nodo_origen,direccion' }
+      { url: direccion },
+      { onConflict: 'url' }
     )
+
   if (error) console.error('[DB] Error al guardar peer:', error.message)
 }
 
+/**
+ * Carga todos los peers registrados en la tabla nodos.
+ *
+ * @returns {string[]} Array de URLs de peers
+ */
 async function cargarPeers(nodeId) {
   const { data, error } = await supabase
-    .from('nodos_red')
-    .select('direccion')
-    .eq('nodo_origen', nodeId)
-    .eq('activo', true)
+    .from('nodos')
+    .select('url')
+
   if (error) {
     console.error('[DB] Error al cargar peers:', error.message)
     return []
   }
-  return data.map(r => r.direccion)
+
+  return (data || []).map(r => r.url)
 }
 
-module.exports = { persistirBloque, marcarComoPropagado, cargarCadena, guardarPeer, cargarPeers }
+module.exports = { persistirBloque, cargarCadena, guardarPeer, cargarPeers }
