@@ -37,4 +37,16 @@ router.post('/', async (req, res) => {
   })
 })
 
+/**
+ * GET /transactions/pending
+ * Lista las transacciones pendientes de minar.
+ */
+router.get('/pending', (req, res) => {
+  const blockchain = req.app.get('blockchain')
+  res.json({
+    transacciones: blockchain.transaccionesPendientes,
+    total:         blockchain.transaccionesPendientes.length,
+  })
+})
+
 module.exports = router
