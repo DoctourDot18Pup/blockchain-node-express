@@ -1,19 +1,19 @@
-const Block = require('./Block')
+const Block      = require('./Block')
 const Transaction = require('./Transaction')
+const { sha256 }  = require('../utils/hash')
 
 const DIFFICULTY = parseInt(process.env.PROOF_OF_WORK_DIFFICULTY || '3')
 
 class Blockchain {
   constructor() {
-    this.chain = []
+    this.chain                   = []
     this.transaccionesPendientes = []
-    this.nodos = new Set()
+    this.nodos                   = new Set()
   }
 
   /**
    * Inicializa la cadena cargando desde Supabase.
-   * Si no hay bloques persistidos, crea el génesis.
-   * Se debe llamar con await antes de arrancar el servidor.
+   * Si no hay bloques persistidos, crea el bloque génesis.
    */
   async inicializar() {
     const { cargarCadena, cargarPeers } = require('../db/grados')
@@ -35,18 +35,32 @@ class Blockchain {
       console.log(`[Blockchain] ${peersPersistidos.length} peer(s) restaurados desde Supabase`)
     }
   }
+
   // ─── Bloque génesis ──────────────────────────────────────────────────────────
 
   _crearBloqueGenesis() {
-    const genesis = new Block(
-      0,
-      Date.now(),
-      { mensaje: 'Bloque Génesis - Red Blockchain Grados Académicos' },
-      '0',
-      0
-    )
+    // El génesis usa campos nulos/vacíos — se calcula el nonce igual que cualquier bloque
+    let nonce = 0
+    let hash  = sha256('', '', 'GENESIS', '2000-01-01', '', nonce)
+    while (!hash.startsWith('0'.repeat(DIFFICULTY))) {
+      nonce++
+      hash = sha256('', '', 'GENESIS', '2000-01-01', '', nonce)
+    }
+
+    const genesis = {
+      persona_id:      null,
+      institucion_id:  null,
+      programa_id:     null,
+      titulo_obtenido: 'GENESIS',
+      fecha_fin:       '2000-01-01',
+      hash_anterior:   null,
+      hash_actual:     hash,
+      nonce,
+      firmado_por:     'sistema',
+    }
+
     this.chain.push(genesis)
-    console.log(`[Blockchain] Bloque génesis creado: ${genesis.hashActual}`)
+    console.log(`[Blockchain] Bloque génesis creado: ${hash}`)
   }
 
   // ─── Getters ─────────────────────────────────────────────────────────────────
@@ -57,22 +71,34 @@ class Blockchain {
 
   // ─── Proof of Work ───────────────────────────────────────────────────────────
 
-  proofOfWork(data) {
-    const index = this.chain.length
-    const timestamp = Date.now()
-    const hashAnterior = this.ultimoBloque.hashActual
+  proofOfWork(tx) {
+    const hashAnterior = this.ultimoBloque.hash_actual
     let nonce = 0
 
-    console.log(`[PoW] Minando bloque #${index} con dificultad ${DIFFICULTY}...`)
+    console.log(`[PoW] Minando con dificultad ${'0'.repeat(DIFFICULTY)}...`)
 
-    let bloque = new Block(index, timestamp, data, hashAnterior, nonce)
-    while (!bloque.cumpleDificultad(DIFFICULTY)) {
+    let hash = sha256(
+      tx.persona_id      ?? '',
+      tx.institucion_id  ?? '',
+      tx.titulo_obtenido ?? '',
+      tx.fecha_fin       ?? '',
+      hashAnterior,
+      nonce,
+    )
+    while (!hash.startsWith('0'.repeat(DIFFICULTY))) {
       nonce++
-      bloque = new Block(index, timestamp, data, hashAnterior, nonce)
+      hash = sha256(
+        tx.persona_id      ?? '',
+        tx.institucion_id  ?? '',
+        tx.titulo_obtenido ?? '',
+        tx.fecha_fin       ?? '',
+        hashAnterior,
+        nonce,
+      )
     }
 
-    console.log(`[PoW] Bloque #${index} minado! nonce=${nonce} hash=${bloque.hashActual}`)
-    return bloque
+    console.log(`[PoW] Nonce encontrado: ${nonce} | Hash: ${hash}`)
+    return { nonce, hash, hashAnterior }
   }
 
   // ─── Minado ──────────────────────────────────────────────────────────────────
@@ -82,14 +108,29 @@ class Blockchain {
       throw new Error('No hay transacciones pendientes para minar')
     }
 
-    const data = {
-      transacciones: [...this.transaccionesPendientes],
-      minadoPor: nodeId,
+    // Un bloque por transacción — alineado con Flask, Laravel y NextJS
+    const tx = this.transaccionesPendientes[0]
+
+    const { nonce, hash, hashAnterior } = this.proofOfWork(tx)
+
+    const bloque = {
+      persona_id:      tx.persona_id,
+      institucion_id:  tx.institucion_id,
+      programa_id:     tx.programa_id     ?? null,
+      titulo_obtenido: tx.titulo_obtenido,
+      fecha_inicio:    tx.fecha_inicio    ?? null,
+      fecha_fin:       tx.fecha_fin,
+      numero_cedula:   tx.numero_cedula   ?? null,
+      titulo_tesis:    tx.titulo_tesis    ?? null,
+      menciones:       tx.menciones       ?? null,
+      hash_actual:     hash,
+      hash_anterior:   hashAnterior,
+      nonce,
+      firmado_por:     nodeId,
     }
 
-    const bloque = this.proofOfWork(data)
     this.chain.push(bloque)
-    this.transaccionesPendientes = []
+    this.transaccionesPendientes.shift()
 
     // Persistir en Supabase de forma no bloqueante
     const { persistirBloque } = require('../db/grados')
@@ -102,8 +143,8 @@ class Blockchain {
 
   // ─── Transacciones ───────────────────────────────────────────────────────────
 
-  agregarTransaccion(datosGrado) {
-    const tx = new Transaction(datosGrado)
+  agregarTransaccion(datos) {
+    const tx = new Transaction(datos)
     this.transaccionesPendientes.push(tx)
     console.log(`[Transaccion] Nueva transacción agregada: ${tx.id}`)
     return tx
@@ -113,25 +154,31 @@ class Blockchain {
 
   esValida(chain = this.chain) {
     for (let i = 1; i < chain.length; i++) {
-      const actual = chain[i]
+      const actual   = chain[i]
       const anterior = chain[i - 1]
 
-      const bloqueRecalculado = new Block(
-        actual.index,
-        actual.timestamp,
-        actual.data,
-        actual.hashAnterior,
-        actual.nonce
-      )
-      if (actual.hashActual !== bloqueRecalculado.hashActual) {
-        console.warn(`[Validacion] Hash inválido en bloque #${i}`)
-        return false
-      }
-      if (actual.hashAnterior !== anterior.hashActual) {
+      // Verificar encadenamiento
+      if (actual.hash_anterior !== anterior.hash_actual) {
         console.warn(`[Validacion] Encadenamiento roto en bloque #${i}`)
         return false
       }
-      if (!actual.cumpleDificultad(DIFFICULTY)) {
+
+      // Recalcular hash con la fórmula canónica
+      const hashRecalculado = sha256(
+        actual.persona_id      ?? '',
+        actual.institucion_id  ?? '',
+        actual.titulo_obtenido ?? '',
+        actual.fecha_fin       ?? '',
+        actual.hash_anterior   ?? '',
+        actual.nonce,
+      )
+
+      if (actual.hash_actual !== hashRecalculado) {
+        console.warn(`[Validacion] Hash inválido en bloque #${i}`)
+        return false
+      }
+
+      if (!actual.hash_actual.startsWith('0'.repeat(DIFFICULTY))) {
         console.warn(`[Validacion] PoW inválido en bloque #${i}`)
         return false
       }
@@ -152,8 +199,8 @@ class Blockchain {
 
   // ─── Nodos ───────────────────────────────────────────────────────────────────
 
-  registrarNodo(direccion) {
-    const dir = direccion.replace(/\/$/, '')
+  registrarNodo(url) {
+    const dir = url.replace(/\/$/, '')
     this.nodos.add(dir)
     console.log(`[Red] Nodo registrado: ${dir}. Total nodos: ${this.nodos.size}`)
 
