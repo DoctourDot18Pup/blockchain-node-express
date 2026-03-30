@@ -8,7 +8,10 @@
     "dev": "nodemon src/app.js",
     "node1": "PORT=8001 NODE_ID=nodo-1 nodemon src/app.js",
     "node2": "PORT=8002 NODE_ID=nodo-2 nodemon src/app.js",
-    "node3": "PORT=8003 NODE_ID=nodo-3 nodemon src/app.js"
+    "node3": "PORT=8003 NODE_ID=nodo-3 nodemon src/app.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:verbose": "jest --verbose"
   },
   "repository": {
     "type": "git",
@@ -36,6 +39,8 @@
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   }
 }
