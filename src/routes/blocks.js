@@ -1,5 +1,6 @@
-const express = require('express')
-const router  = express.Router()
+const express      = require('express')
+const { sha256 }   = require('../utils/hash')
+const router       = express.Router()
 
 /**
  * POST /blocks/receive
@@ -19,6 +20,19 @@ router.post('/receive', (req, res) => {
 
   if (bloque.hash_anterior !== ultimoLocal.hash_actual) {
     return res.status(409).json({ error: 'El hash anterior no coincide — usa /nodes/resolve para sincronizar' })
+  }
+
+  // Verificar integridad: recalcular el hash desde los datos del bloque
+  const hashEsperado = sha256(
+    bloque.persona_id      ?? '',
+    bloque.institucion_id  ?? '',
+    bloque.titulo_obtenido ?? '',
+    bloque.fecha_fin       ?? '',
+    bloque.hash_anterior   ?? '',
+    bloque.nonce,
+  )
+  if (bloque.hash_actual !== hashEsperado) {
+    return res.status(400).json({ error: 'Hash inválido: los datos del bloque no coinciden con el hash declarado' })
   }
 
   if (!bloque.hash_actual.startsWith('0'.repeat(DIFFICULTY))) {

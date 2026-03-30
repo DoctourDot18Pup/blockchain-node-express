@@ -144,6 +144,10 @@ class Blockchain {
   // ─── Transacciones ───────────────────────────────────────────────────────────
 
   agregarTransaccion(datos) {
+    const maxMempool = parseInt(process.env.MAX_MEMPOOL_SIZE || '100')
+    if (this.transaccionesPendientes.length >= maxMempool) {
+      throw new Error(`Mempool llena (máximo ${maxMempool} transacciones pendientes)`)
+    }
     const tx = new Transaction(datos)
     this.transaccionesPendientes.push(tx)
     console.log(`[Transaccion] Nueva transacción agregada: ${tx.id}`)
@@ -178,7 +182,8 @@ class Blockchain {
         return false
       }
 
-      if (!actual.hash_actual.startsWith('0'.repeat(DIFFICULTY))) {
+      const difficulty = parseInt(process.env.PROOF_OF_WORK_DIFFICULTY || '3')
+      if (!actual.hash_actual.startsWith('0'.repeat(difficulty))) {
         console.warn(`[Validacion] PoW inválido en bloque #${i}`)
         return false
       }

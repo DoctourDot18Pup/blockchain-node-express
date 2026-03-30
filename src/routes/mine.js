@@ -17,7 +17,8 @@ router.post('/', async (req, res) => {
     const nodos = blockchain.getNodos()
     const propagaciones = nodos.map(nodo =>
       axios.post(`${nodo}/blocks/receive`, bloque, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 5000,
       }).catch(err => console.warn(`[Propagacion] Fallo nodo ${nodo}: ${err.message}`))
     )
     await Promise.allSettled(propagaciones)

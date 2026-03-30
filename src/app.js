@@ -10,10 +10,11 @@ const transactionRoutes = require('./routes/transactions')
 const nodeRoutes        = require('./routes/nodes')
 const blocksRoutes      = require('./routes/blocks')
 
-const swaggerUi  = require('swagger-ui-express')
-const YAML       = require('yamljs')
-const swaggerDoc = YAML.load('./swagger.yaml')
-const cors       = require('cors')
+const swaggerUi   = require('swagger-ui-express')
+const YAML        = require('yamljs')
+const swaggerDoc  = YAML.load('./swagger.yaml')
+const cors        = require('cors')
+const rateLimit   = require('express-rate-limit')
 
 async function startServer() {
   const app  = express()
@@ -27,10 +28,27 @@ async function startServer() {
   app.use(cors())
   app.use(logger)
 
+  // Rate limiting: evita abuso de endpoints costosos
+  const limiteMine = rateLimit({
+    windowMs: 60 * 1000,  // ventana de 1 minuto
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiadas peticiones de minado, intenta en un minuto' },
+  })
+
+  const limiteTransacciones = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiadas transacciones, intenta en un minuto' },
+  })
+
   // Rutas del contrato común
   app.use('/chain',        chainRoutes)
-  app.use('/mine',         mineRoutes)
-  app.use('/transactions', transactionRoutes)
+  app.use('/mine',         limiteMine, mineRoutes)
+  app.use('/transactions', limiteTransacciones, transactionRoutes)
   app.use('/nodes',        nodeRoutes)
   app.use('/blocks',       blocksRoutes)
 
