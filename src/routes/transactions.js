@@ -37,13 +37,19 @@ router.post('/', async (req, res) => {
     })
   }
 
-  const tx = blockchain.agregarTransaccion(req.body)
+  let tx
+  try {
+    tx = blockchain.agregarTransaccion(req.body)
+  } catch (err) {
+    return res.status(507).json({ error: err.message })
+  }
 
   if (!propagado) {
     const nodos = blockchain.getNodos()
     const propagaciones = nodos.map(nodo =>
       axios.post(`${nodo}/transactions`, req.body, {
-        headers: { 'X-Propagated': 'true' }
+        headers: { 'X-Propagated': 'true' },
+        timeout: 5000,
       }).catch(err => console.warn(`[Propagacion] Fallo nodo ${nodo}: ${err.message}`))
     )
     await Promise.allSettled(propagaciones)

@@ -67,7 +67,7 @@ router.get('/resolve', async (req, res) => {
   let reemplazada = false
 
   const consultas = nodos.map(nodo =>
-    axios.get(`${nodo}/chain`)
+    axios.get(`${nodo}/chain`, { timeout: 5000 })
       .then(response => {
         const { chain } = response.data
         if (blockchain.reemplazarCadena(chain)) {
