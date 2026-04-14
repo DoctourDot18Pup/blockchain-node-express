@@ -1,6 +1,7 @@
 require('dotenv').config()
 
 const express    = require('express')
+const path       = require('path')
 const Blockchain = require('./blockchain/Blockchain')
 const logger     = require('./middleware/logger')
 
@@ -10,12 +11,11 @@ const transactionRoutes = require('./routes/transactions')
 const nodeRoutes        = require('./routes/nodes')
 const blocksRoutes      = require('./routes/blocks')
 
-const swaggerUi   = require('swagger-ui-express')
-const YAML        = require('yamljs')
-const path = require('path')
-const swaggerDoc = YAML.load(path.join(__dirname, '../../swagger.yaml'))
-const cors        = require('cors')
-const rateLimit   = require('express-rate-limit')
+const swaggerUi  = require('swagger-ui-express')
+const YAML       = require('yamljs')
+const swaggerDoc = YAML.load(path.join(__dirname, '../swagger.yaml'))
+const cors       = require('cors')
+const rateLimit  = require('express-rate-limit')
 
 async function startServer() {
   const app  = express()
@@ -29,9 +29,8 @@ async function startServer() {
   app.use(cors())
   app.use(logger)
 
-  // Rate limiting: evita abuso de endpoints costosos
   const limiteMine = rateLimit({
-    windowMs: 60 * 1000,  // ventana de 1 minuto
+    windowMs: 60 * 1000,
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
@@ -46,7 +45,6 @@ async function startServer() {
     message: { error: 'Demasiadas transacciones, intenta en un minuto' },
   })
 
-  // Rutas del contrato común
   app.use('/chain',        chainRoutes)
   app.use('/mine',         limiteMine, mineRoutes)
   app.use('/transactions', limiteTransacciones, transactionRoutes)
