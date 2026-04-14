@@ -12,7 +12,8 @@ const blocksRoutes      = require('./routes/blocks')
 
 const swaggerUi   = require('swagger-ui-express')
 const YAML        = require('yamljs')
-const swaggerDoc  = YAML.load('./swagger.yaml')
+const path = require('path')
+const swaggerDoc = YAML.load(path.join(__dirname, '../../swagger.yaml'))
 const cors        = require('cors')
 const rateLimit   = require('express-rate-limit')
 
